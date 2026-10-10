@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keep the latest row per key with QUALIFY | Malek Damiri</title>
+<meta name="description" content="Taking max() of each column mixes values from different rows. QUALIFY keeps one whole row per key.">
+<meta name="author" content="Malek Damiri">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://malekdamiri.org/notes/latest-row-per-key/">
+<meta property="og:site_name" content="Malek Damiri">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Keep the latest row per key with QUALIFY | Malek Damiri">
+<meta property="og:description" content="Taking max() of each column mixes values from different rows. QUALIFY keeps one whole row per key.">
+<meta property="og:url" content="https://malekdamiri.org/notes/latest-row-per-key/">
+<meta property="og:image" content="https://malekdamiri.org/img/malek-damiri-navy-tee-park.jpg">
+<meta property="og:image:width" content="900">
+<meta property="og:image:height" content="1199">
+<meta property="og:image:alt" content="Malek Damiri in a navy t-shirt in a park with a large tree behind him">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/css/site.css?v=1">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://malekdamiri.org/#website","url":"https://malekdamiri.org/","name":"Malek Damiri","inLanguage":"en-US","publisher":{"@id":"https://malekdamiri.org/#person"}},{"@type":"Person","@id":"https://malekdamiri.org/#person","name":"Malek Damiri","givenName":"Malek","familyName":"Damiri","url":"https://malekdamiri.org/","jobTitle":"Head of Revenue Operations","homeLocation":{"@type":"Place","name":"Atlanta, Georgia"},"image":{"@id":"https://malekdamiri.org/#image-black-jacket-portrait"},"sameAs":["https://malekdamiri.com/","https://www.linkedin.com/in/malekdamiri/","https://github.com/malekdamiri","https://www.youtube.com/@malek.damiri","https://speakerdeck.com/malekdamiri","https://www.flickr.com/photos/128322174@N02/","https://www.pinterest.com/malek_damiri/","https://medium.com/@malekdamiri43","https://malekdamiri.hashnode.dev/","https://hackernoon.com/u/malekdamiri","https://malekdamiri.blogspot.com/","https://www.goodreads.com/malekdamiri","https://soundcloud.com/malek-damiri","https://x.com/malekdamiri"]},{"@type":"TechArticle","@id":"https://malekdamiri.org/notes/latest-row-per-key/#article","headline":"Keep the latest row per key with QUALIFY","description":"Taking max() of each column mixes values from different rows. QUALIFY keeps one whole row per key.","url":"https://malekdamiri.org/notes/latest-row-per-key/","datePublished":"2026-10-10","dateModified":"2026-10-10","author":{"@id":"https://malekdamiri.org/#person"},"publisher":{"@id":"https://malekdamiri.org/#person"},"isPartOf":{"@id":"https://malekdamiri.org/#website"},"inLanguage":"en-US","proficiencyLevel":"Beginner"}]}</script>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="name" href="/">Malek Damiri</a><nav class="nav" aria-label="Main"><a href="/notes/">Notes</a><a href="/photos/">Photos</a><a href="/about/">About</a></nav></div></header>
+<main id="main"><div class="wrap">
+
+<article>
+<h1>Keep the latest row per key with QUALIFY</h1>
+<p class="meta"><a href="/about/" rel="author">Malek Damiri</a> · <time datetime="2026-10-10">October 10, 2026</time></p>
+<p>History tables are everywhere in revenue data: plan changes, price changes, owner changes. The question is almost always "what is true now?", and the tempting answer, <code>max()</code> of each column, is wrong in a way that's easy to miss.</p>
+<h2>The data</h2>
+<pre><code>create table plan_changes as select * from (values
+  (&#x27;acme&#x27;,    timestamp &#x27;2026-07-01 09:00&#x27;, &#x27;starter&#x27;,    500),
+  (&#x27;acme&#x27;,    timestamp &#x27;2026-08-15 14:30&#x27;, &#x27;growth&#x27;,     1200),
+  (&#x27;acme&#x27;,    timestamp &#x27;2026-08-15 14:30&#x27;, &#x27;growth&#x27;,     1200),  -- loaded twice
+  (&#x27;globex&#x27;,  timestamp &#x27;2026-06-10 11:00&#x27;, &#x27;growth&#x27;,     1200),
+  (&#x27;initech&#x27;, timestamp &#x27;2026-05-02 08:00&#x27;, &#x27;starter&#x27;,    500),
+  (&#x27;initech&#x27;, timestamp &#x27;2026-09-01 10:00&#x27;, &#x27;enterprise&#x27;, 4000)
+) t(account, changed_at, plan, mrr);</code></pre>
+<h2>What max() does</h2>
+<pre><code>select account, max(plan) as plan, max(mrr) as mrr
+from plan_changes
+group by account
+order by account;</code></pre>
+<pre class="result"><code>account   plan      mrr
+acme      starter   1200
+globex    growth    1200
+initech   starter   4000</code></pre>
+<p>Each column is maximized on its own, so the plan comes from one row and the MRR from another. <code>max(plan)</code> is alphabetical, which is how initech ends up on "starter" at enterprise pricing. Summing the raw table is worse: 8,600 of MRR, counting acme's old plan and its duplicate.</p>
+<h2>QUALIFY keeps whole rows</h2>
+<pre><code>select account, plan, mrr
+from plan_changes
+qualify row_number() over (partition by account order by changed_at desc) = 1
+order by account;</code></pre>
+<pre class="result"><code>account   plan         mrr
+acme      growth       1200
+globex    growth       1200
+initech   enterprise   4000</code></pre>
+<p>One row per account, taken whole, and current MRR is 6,400. <code>qualify</code> filters on a window function the way <code>having</code> filters on an aggregate, so there's no subquery.</p>
+<h2>Break ties on purpose</h2>
+<p>Acme has two rows at the same timestamp. Here they're identical, so it doesn't matter which one wins. When tied rows differ, <code>row_number()</code> picks one arbitrarily and the answer can change between runs. Add a second sort key that's always unique, such as a load timestamp or a row id.</p>
+<p><code>qualify</code> works in Snowflake, BigQuery, Databricks and DuckDB. In Postgres, wrap the window function in a subquery or use <code>distinct on</code>.</p>
+<p class="note">Every query here ran in DuckDB 1.5.1 and returned the output shown. This note was written with AI assistance.</p>
+</article>
+<nav class="pager" aria-label="More notes"><a href="/notes/date-spine/">← Build a date spine so empty days count</a> <a href="/notes/join-fan-out/">Check row counts before you trust a join →</a></nav>
+
+</div></main>
+<footer class="foot"><div class="wrap"><span>&copy; 2026 Malek Damiri · Atlanta</span><span>Essays at <a href="https://malekdamiri.com/" rel="me">malekdamiri.com</a></span></div></footer>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build a date spine so empty days count | Malek Damiri</title>
+<meta name="description" content="GROUP BY drops the days with no rows. A date spine puts them back, and changes the average.">
+<meta name="author" content="Malek Damiri">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://malekdamiri.org/notes/date-spine/">
+<meta property="og:site_name" content="Malek Damiri">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Build a date spine so empty days count | Malek Damiri">
+<meta property="og:description" content="GROUP BY drops the days with no rows. A date spine puts them back, and changes the average.">
+<meta property="og:url" content="https://malekdamiri.org/notes/date-spine/">
+<meta property="og:image" content="https://malekdamiri.org/img/malek-damiri-navy-tee-park.jpg">
+<meta property="og:image:width" content="900">
+<meta property="og:image:height" content="1199">
+<meta property="og:image:alt" content="Malek Damiri in a navy t-shirt in a park with a large tree behind him">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/css/site.css?v=1">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://malekdamiri.org/#website","url":"https://malekdamiri.org/","name":"Malek Damiri","inLanguage":"en-US","publisher":{"@id":"https://malekdamiri.org/#person"}},{"@type":"Person","@id":"https://malekdamiri.org/#person","name":"Malek Damiri","givenName":"Malek","familyName":"Damiri","url":"https://malekdamiri.org/","jobTitle":"Head of Revenue Operations","homeLocation":{"@type":"Place","name":"Atlanta, Georgia"},"image":{"@id":"https://malekdamiri.org/#image-black-jacket-portrait"},"sameAs":["https://malekdamiri.com/","https://www.linkedin.com/in/malekdamiri/","https://github.com/malekdamiri","https://www.youtube.com/@malek.damiri","https://speakerdeck.com/malekdamiri","https://www.flickr.com/photos/128322174@N02/","https://www.pinterest.com/malek_damiri/","https://medium.com/@malekdamiri43","https://malekdamiri.hashnode.dev/","https://hackernoon.com/u/malekdamiri","https://malekdamiri.blogspot.com/","https://www.goodreads.com/malekdamiri","https://soundcloud.com/malek-damiri","https://x.com/malekdamiri"]},{"@type":"TechArticle","@id":"https://malekdamiri.org/notes/date-spine/#article","headline":"Build a date spine so empty days count","description":"GROUP BY drops the days with no rows. A date spine puts them back, and changes the average.","url":"https://malekdamiri.org/notes/date-spine/","datePublished":"2026-10-10","dateModified":"2026-10-10","author":{"@id":"https://malekdamiri.org/#person"},"publisher":{"@id":"https://malekdamiri.org/#person"},"isPartOf":{"@id":"https://malekdamiri.org/#website"},"inLanguage":"en-US","proficiencyLevel":"Beginner"}]}</script>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="name" href="/">Malek Damiri</a><nav class="nav" aria-label="Main"><a href="/notes/">Notes</a><a href="/photos/">Photos</a><a href="/about/">About</a></nav></div></header>
+<main id="main"><div class="wrap">
+
+<article>
+<h1>Build a date spine so empty days count</h1>
+<p class="meta"><a href="/about/" rel="author">Malek Damiri</a> · <time datetime="2026-10-10">October 10, 2026</time></p>
+<p>Group revenue by day and the days with no orders disappear. The chart skips them, and every average built on top quietly assumes they never happened. The fix is a date spine: one row per day, joined to the data, so an empty day shows up as zero.</p>
+<h2>The problem</h2>
+<p>Five orders across a seven-day week:</p>
+<pre><code>create table orders as select * from (values
+  (date &#x27;2026-09-01&#x27;, 120.00), (date &#x27;2026-09-01&#x27;, 80.00),
+  (date &#x27;2026-09-02&#x27;, 200.00),
+  (date &#x27;2026-09-04&#x27;, 150.00),
+  (date &#x27;2026-09-07&#x27;, 90.00)
+) t(order_date, amount);
+
+select order_date, sum(amount) as revenue
+from orders
+group by order_date
+order by order_date;</code></pre>
+<pre class="result"><code>order_date   revenue
+2026-09-01    200.00
+2026-09-02    200.00
+2026-09-04    150.00
+2026-09-07     90.00</code></pre>
+<p>Four rows for a seven-day week. Average them and you get 160.00 a day, which is the average of the days that had orders, not of the week.</p>
+<h2>The fix</h2>
+<pre><code>with spine as (
+  select cast(d as date) as day
+  from generate_series(date &#x27;2026-09-01&#x27;, date &#x27;2026-09-07&#x27;, interval 1 day) as g(d)
+)
+select s.day, coalesce(sum(o.amount), 0) as revenue
+from spine as s
+left join orders as o on o.order_date = s.day
+group by s.day
+order by s.day;</code></pre>
+<pre class="result"><code>day          revenue
+2026-09-01    200.00
+2026-09-02    200.00
+2026-09-03      0.00
+2026-09-04    150.00
+2026-09-05      0.00
+2026-09-06      0.00
+2026-09-07     90.00</code></pre>
+<p>Seven rows, and the daily average is 91.43. Same orders, a very different story about the week.</p>
+<p>Two details matter. The spine goes on the left of a <code>left join</code>, so every day survives. And <code>coalesce</code> turns the empty sums into zero; without it, the empty days come back as <code>null</code> and most averages skip them again.</p>
+<h2>In Snowflake</h2>
+<p>Snowflake has no <code>generate_series</code>. The usual pattern is a generator with <code>row_number()</code>, because <code>seq4()</code> on its own isn't guaranteed to be gap-free:</p>
+<pre><code>select dateadd(day, row_number() over (order by seq4()) - 1, &#x27;2026-09-01&#x27;::date) as day
+from table(generator(rowcount =&gt; 7));</code></pre>
+<h2>Where it bites</h2>
+<p>Daily revenue charts, rolling seven-day averages, "days since last order", and any cohort grid where a missing cell should read as zero. If you build these often, keep a permanent date table in the warehouse and join to it, instead of generating a spine in every query.</p>
+<p class="note">Every query here ran in DuckDB 1.5.1 and returned the output shown. This note was written with AI assistance.</p>
+</article>
+<nav class="pager" aria-label="More notes"><a href="/notes/latest-row-per-key/">Keep the latest row per key with QUALIFY →</a></nav>
+
+</div></main>
+<footer class="foot"><div class="wrap"><span>&copy; 2026 Malek Damiri · Atlanta</span><span>Essays at <a href="https://malekdamiri.com/" rel="me">malekdamiri.com</a></span></div></footer>
+</body>
+</html>

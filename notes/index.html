@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notes by Malek Damiri</title>
+<meta name="description" content="Short SQL notes by Malek Damiri: date spines, latest-row queries, join fan-out, streaks, and month-over-month change.">
+<meta name="author" content="Malek Damiri">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://malekdamiri.org/notes/">
+<meta property="og:site_name" content="Malek Damiri">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Notes by Malek Damiri">
+<meta property="og:description" content="Short SQL notes by Malek Damiri: date spines, latest-row queries, join fan-out, streaks, and month-over-month change.">
+<meta property="og:url" content="https://malekdamiri.org/notes/">
+<meta property="og:image" content="https://malekdamiri.org/img/malek-damiri-navy-tee-park.jpg">
+<meta property="og:image:width" content="900">
+<meta property="og:image:height" content="1199">
+<meta property="og:image:alt" content="Malek Damiri in a navy t-shirt in a park with a large tree behind him">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/css/site.css?v=1">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://malekdamiri.org/#website","url":"https://malekdamiri.org/","name":"Malek Damiri","inLanguage":"en-US","publisher":{"@id":"https://malekdamiri.org/#person"}},{"@type":"Person","@id":"https://malekdamiri.org/#person","name":"Malek Damiri","givenName":"Malek","familyName":"Damiri","url":"https://malekdamiri.org/","jobTitle":"Head of Revenue Operations","homeLocation":{"@type":"Place","name":"Atlanta, Georgia"},"image":{"@id":"https://malekdamiri.org/#image-black-jacket-portrait"},"sameAs":["https://malekdamiri.com/","https://www.linkedin.com/in/malekdamiri/","https://github.com/malekdamiri","https://www.youtube.com/@malek.damiri","https://speakerdeck.com/malekdamiri","https://www.flickr.com/photos/128322174@N02/","https://www.pinterest.com/malek_damiri/","https://medium.com/@malekdamiri43","https://malekdamiri.hashnode.dev/","https://hackernoon.com/u/malekdamiri","https://malekdamiri.blogspot.com/","https://www.goodreads.com/malekdamiri","https://soundcloud.com/malek-damiri","https://x.com/malekdamiri"]},{"@type":"CollectionPage","@id":"https://malekdamiri.org/notes/#webpage","url":"https://malekdamiri.org/notes/","name":"Notes by Malek Damiri","isPartOf":{"@id":"https://malekdamiri.org/#website"},"author":{"@id":"https://malekdamiri.org/#person"},"hasPart":[{"@id":"https://malekdamiri.org/notes/date-spine/#article"},{"@id":"https://malekdamiri.org/notes/latest-row-per-key/#article"},{"@id":"https://malekdamiri.org/notes/join-fan-out/#article"},{"@id":"https://malekdamiri.org/notes/gaps-and-islands/#article"},{"@id":"https://malekdamiri.org/notes/lag-previous-row/#article"}]}]}</script>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="name" href="/">Malek Damiri</a><nav class="nav" aria-label="Main"><a href="/notes/">Notes</a><a href="/photos/">Photos</a><a href="/about/">About</a></nav></div></header>
+<main id="main"><div class="wrap">
+
+<h1>Notes</h1>
+<p class="lede">Short SQL notes by Malek Damiri. Each one is a pattern I use in revenue reporting, with a small dataset you can paste into DuckDB and the exact output it returns.</p>
+<ul class="list">
+<li><a href="/notes/date-spine/">Build a date spine so empty days count</a><span>GROUP BY drops the days with no rows. A date spine puts them back, and changes the average.</span></li>
+<li><a href="/notes/latest-row-per-key/">Keep the latest row per key with QUALIFY</a><span>Taking max() of each column mixes values from different rows. QUALIFY keeps one whole row per key.</span></li>
+<li><a href="/notes/join-fan-out/">Check row counts before you trust a join</a><span>A join to a table with duplicate keys multiplies revenue. Two quick checks catch it.</span></li>
+<li><a href="/notes/gaps-and-islands/">Find streaks with gaps and islands</a><span>Subtract a row number from a month number and consecutive months share a value. That&#x27;s the whole trick.</span></li>
+<li><a href="/notes/lag-previous-row/">LAG compares to the previous row, not the previous month</a><span>When a month is missing, LAG silently compares to an older one. Fill the months first.</span></li>
+</ul>
+
+</div></main>
+<footer class="foot"><div class="wrap"><span>&copy; 2026 Malek Damiri · Atlanta</span><span>Essays at <a href="https://malekdamiri.com/" rel="me">malekdamiri.com</a></span></div></footer>
+</body>
+</html>

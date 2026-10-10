@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find streaks with gaps and islands | Malek Damiri</title>
+<meta name="description" content="Subtract a row number from a month number and consecutive months share a value. That&#x27;s the whole trick.">
+<meta name="author" content="Malek Damiri">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://malekdamiri.org/notes/gaps-and-islands/">
+<meta property="og:site_name" content="Malek Damiri">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Find streaks with gaps and islands | Malek Damiri">
+<meta property="og:description" content="Subtract a row number from a month number and consecutive months share a value. That&#x27;s the whole trick.">
+<meta property="og:url" content="https://malekdamiri.org/notes/gaps-and-islands/">
+<meta property="og:image" content="https://malekdamiri.org/img/malek-damiri-navy-tee-park.jpg">
+<meta property="og:image:width" content="900">
+<meta property="og:image:height" content="1199">
+<meta property="og:image:alt" content="Malek Damiri in a navy t-shirt in a park with a large tree behind him">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/css/site.css?v=1">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://malekdamiri.org/#website","url":"https://malekdamiri.org/","name":"Malek Damiri","inLanguage":"en-US","publisher":{"@id":"https://malekdamiri.org/#person"}},{"@type":"Person","@id":"https://malekdamiri.org/#person","name":"Malek Damiri","givenName":"Malek","familyName":"Damiri","url":"https://malekdamiri.org/","jobTitle":"Head of Revenue Operations","homeLocation":{"@type":"Place","name":"Atlanta, Georgia"},"image":{"@id":"https://malekdamiri.org/#image-black-jacket-portrait"},"sameAs":["https://malekdamiri.com/","https://www.linkedin.com/in/malekdamiri/","https://github.com/malekdamiri","https://www.youtube.com/@malek.damiri","https://speakerdeck.com/malekdamiri","https://www.flickr.com/photos/128322174@N02/","https://www.pinterest.com/malek_damiri/","https://medium.com/@malekdamiri43","https://malekdamiri.hashnode.dev/","https://hackernoon.com/u/malekdamiri","https://malekdamiri.blogspot.com/","https://www.goodreads.com/malekdamiri","https://soundcloud.com/malek-damiri","https://x.com/malekdamiri"]},{"@type":"TechArticle","@id":"https://malekdamiri.org/notes/gaps-and-islands/#article","headline":"Find streaks with gaps and islands","description":"Subtract a row number from a month number and consecutive months share a value. That's the whole trick.","url":"https://malekdamiri.org/notes/gaps-and-islands/","datePublished":"2026-10-10","dateModified":"2026-10-10","author":{"@id":"https://malekdamiri.org/#person"},"publisher":{"@id":"https://malekdamiri.org/#person"},"isPartOf":{"@id":"https://malekdamiri.org/#website"},"inLanguage":"en-US","proficiencyLevel":"Beginner"}]}</script>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="name" href="/">Malek Damiri</a><nav class="nav" aria-label="Main"><a href="/notes/">Notes</a><a href="/photos/">Photos</a><a href="/about/">About</a></nav></div></header>
+<main id="main"><div class="wrap">
+
+<article>
+<h1>Find streaks with gaps and islands</h1>
+<p class="meta"><a href="/about/" rel="author">Malek Damiri</a> · <time datetime="2026-10-10">October 10, 2026</time></p>
+<p>"How many months in a row has this customer paid?" sounds like it needs a loop. It doesn't. The gaps-and-islands trick finds every unbroken run in one query.</p>
+<h2>The data</h2>
+<pre><code>create table payments as select * from (values
+  (&#x27;acme&#x27;,   date &#x27;2026-01-01&#x27;), (&#x27;acme&#x27;, date &#x27;2026-02-01&#x27;), (&#x27;acme&#x27;, date &#x27;2026-03-01&#x27;),
+  (&#x27;acme&#x27;,   date &#x27;2026-05-01&#x27;), (&#x27;acme&#x27;, date &#x27;2026-06-01&#x27;),
+  (&#x27;globex&#x27;, date &#x27;2026-02-01&#x27;), (&#x27;globex&#x27;, date &#x27;2026-04-01&#x27;)
+) t(account, paid_month);</code></pre>
+<h2>The query</h2>
+<pre><code>with numbered as (
+  select account, paid_month,
+         date_diff(&#x27;month&#x27;, date &#x27;2000-01-01&#x27;, paid_month) as month_number,
+         row_number() over (partition by account order by paid_month) as rn
+  from payments
+)
+select account,
+       min(paid_month) as streak_start,
+       max(paid_month) as streak_end,
+       count(*) as months
+from numbered
+group by account, month_number - rn
+order by account, streak_start;</code></pre>
+<pre class="result"><code>account   streak_start   streak_end   months
+acme      2026-01-01     2026-03-01        3
+acme      2026-05-01     2026-06-01        2
+globex    2026-02-01     2026-02-01        1
+globex    2026-04-01     2026-04-01        1</code></pre>
+<h2>Why it works</h2>
+<p>Within a streak, the month number and the row number both go up by one each row, so their difference stays the same. A skipped month bumps the month number by two while the row number still goes up by one, so the difference changes and a new group starts. Acme's January to March share one value; May and June share another.</p>
+<h2>Uses</h2>
+<p>Longest paying streak, customers who churned and came back, consecutive days active, and how long an account has been above a usage threshold. In Snowflake, swap in <code>datediff('month', '2000-01-01', paid_month)</code>. The anchor date doesn't matter, as long as it's the same for every row.</p>
+<p>One assumption to check first: one row per account per month. If the table can hold two payments in the same month, deduplicate before numbering, or the streaks come out too long.</p>
+<p class="note">Every query here ran in DuckDB 1.5.1 and returned the output shown. This note was written with AI assistance.</p>
+</article>
+<nav class="pager" aria-label="More notes"><a href="/notes/join-fan-out/">← Check row counts before you trust a join</a> <a href="/notes/lag-previous-row/">LAG compares to the previous row, not the previous month →</a></nav>
+
+</div></main>
+<footer class="foot"><div class="wrap"><span>&copy; 2026 Malek Damiri · Atlanta</span><span>Essays at <a href="https://malekdamiri.com/" rel="me">malekdamiri.com</a></span></div></footer>
+</body>
+</html>

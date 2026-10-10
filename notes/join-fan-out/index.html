@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check row counts before you trust a join | Malek Damiri</title>
+<meta name="description" content="A join to a table with duplicate keys multiplies revenue. Two quick checks catch it.">
+<meta name="author" content="Malek Damiri">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://malekdamiri.org/notes/join-fan-out/">
+<meta property="og:site_name" content="Malek Damiri">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Check row counts before you trust a join | Malek Damiri">
+<meta property="og:description" content="A join to a table with duplicate keys multiplies revenue. Two quick checks catch it.">
+<meta property="og:url" content="https://malekdamiri.org/notes/join-fan-out/">
+<meta property="og:image" content="https://malekdamiri.org/img/malek-damiri-navy-tee-park.jpg">
+<meta property="og:image:width" content="900">
+<meta property="og:image:height" content="1199">
+<meta property="og:image:alt" content="Malek Damiri in a navy t-shirt in a park with a large tree behind him">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/css/site.css?v=1">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://malekdamiri.org/#website","url":"https://malekdamiri.org/","name":"Malek Damiri","inLanguage":"en-US","publisher":{"@id":"https://malekdamiri.org/#person"}},{"@type":"Person","@id":"https://malekdamiri.org/#person","name":"Malek Damiri","givenName":"Malek","familyName":"Damiri","url":"https://malekdamiri.org/","jobTitle":"Head of Revenue Operations","homeLocation":{"@type":"Place","name":"Atlanta, Georgia"},"image":{"@id":"https://malekdamiri.org/#image-black-jacket-portrait"},"sameAs":["https://malekdamiri.com/","https://www.linkedin.com/in/malekdamiri/","https://github.com/malekdamiri","https://www.youtube.com/@malek.damiri","https://speakerdeck.com/malekdamiri","https://www.flickr.com/photos/128322174@N02/","https://www.pinterest.com/malek_damiri/","https://medium.com/@malekdamiri43","https://malekdamiri.hashnode.dev/","https://hackernoon.com/u/malekdamiri","https://malekdamiri.blogspot.com/","https://www.goodreads.com/malekdamiri","https://soundcloud.com/malek-damiri","https://x.com/malekdamiri"]},{"@type":"TechArticle","@id":"https://malekdamiri.org/notes/join-fan-out/#article","headline":"Check row counts before you trust a join","description":"A join to a table with duplicate keys multiplies revenue. Two quick checks catch it.","url":"https://malekdamiri.org/notes/join-fan-out/","datePublished":"2026-10-10","dateModified":"2026-10-10","author":{"@id":"https://malekdamiri.org/#person"},"publisher":{"@id":"https://malekdamiri.org/#person"},"isPartOf":{"@id":"https://malekdamiri.org/#website"},"inLanguage":"en-US","proficiencyLevel":"Beginner"}]}</script>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="name" href="/">Malek Damiri</a><nav class="nav" aria-label="Main"><a href="/notes/">Notes</a><a href="/photos/">Photos</a><a href="/about/">About</a></nav></div></header>
+<main id="main"><div class="wrap">
+
+<article>
+<h1>Check row counts before you trust a join</h1>
+<p class="meta"><a href="/about/" rel="author">Malek Damiri</a> · <time datetime="2026-10-10">October 10, 2026</time></p>
+<p>The most expensive bug in revenue reporting is a join that quietly duplicates rows. Nothing errors, the totals just get bigger. Here's a small version, and the two checks I run before trusting any join.</p>
+<h2>Three invoices become four</h2>
+<pre><code>create table invoices as select * from (values
+  (1, &#x27;acme&#x27;, 1000.00), (2, &#x27;globex&#x27;, 500.00), (3, &#x27;initech&#x27;, 750.00)
+) t(invoice_id, account, amount);
+
+create table account_owners as select * from (values
+  (&#x27;acme&#x27;,    &#x27;dana&#x27;, date &#x27;2026-01-01&#x27;),
+  (&#x27;acme&#x27;,    &#x27;lee&#x27;,  date &#x27;2026-08-01&#x27;),  -- territory change
+  (&#x27;globex&#x27;,  &#x27;sam&#x27;,  date &#x27;2026-01-01&#x27;),
+  (&#x27;initech&#x27;, &#x27;dana&#x27;, date &#x27;2026-03-01&#x27;)
+) t(account, owner, effective_from);
+
+select sum(i.amount) as total
+from invoices as i
+join account_owners as o on o.account = i.account;</code></pre>
+<p>Invoices total 2,250.00. The joined total is 3,250.00, because acme has two owner rows and its invoice now counts twice.</p>
+<h2>Check 1: row counts</h2>
+<pre><code>select
+  (select count(*) from invoices) as invoice_rows,
+  (select count(*) from invoices as i join account_owners as o on o.account = i.account) as joined_rows;</code></pre>
+<pre class="result"><code>invoice_rows   joined_rows
+           3             4</code></pre>
+<p>If a join is supposed to add columns, not rows, these two numbers should match.</p>
+<h2>Check 2: duplicate keys on the "one" side</h2>
+<pre><code>select account, count(*) as owners
+from account_owners
+group by account
+having count(*) &gt; 1;</code></pre>
+<pre class="result"><code>account   owners
+acme           2</code></pre>
+<h2>The fix: decide which row wins</h2>
+<p>The table isn't wrong; it's a history. The query has to choose. Here, the current owner gets the revenue:</p>
+<pre><code>with current_owner as (
+  select account, owner
+  from account_owners
+  qualify row_number() over (partition by account order by effective_from desc) = 1
+)
+select o.owner, sum(i.amount) as revenue
+from invoices as i
+join current_owner as o on o.account = i.account
+group by o.owner
+order by o.owner;</code></pre>
+<pre class="result"><code>owner   revenue
+dana     750.00
+lee     1000.00
+sam      500.00</code></pre>
+<p>Back to 2,250.00. Whether the old owner or the new one should get credit is a business rule, not a SQL question, so write the rule down next to the query.</p>
+<p>If you use dbt, a <code>unique</code> test on the key of every table you join to turns check 2 into something that runs on every build.</p>
+<p class="note">Every query here ran in DuckDB 1.5.1 and returned the output shown. This note was written with AI assistance.</p>
+</article>
+<nav class="pager" aria-label="More notes"><a href="/notes/latest-row-per-key/">← Keep the latest row per key with QUALIFY</a> <a href="/notes/gaps-and-islands/">Find streaks with gaps and islands →</a></nav>
+
+</div></main>
+<footer class="foot"><div class="wrap"><span>&copy; 2026 Malek Damiri · Atlanta</span><span>Essays at <a href="https://malekdamiri.com/" rel="me">malekdamiri.com</a></span></div></footer>
+</body>
+</html>

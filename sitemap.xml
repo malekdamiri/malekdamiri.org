@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://malekdamiri.org/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <image:image><image:loc>https://malekdamiri.org/img/malek-damiri-black-jacket-portrait.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/notes/</loc>
+    <lastmod>2026-10-10</lastmod>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/about/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <image:image><image:loc>https://malekdamiri.org/img/malek-damiri-navy-polo-downtown.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/photos/</loc>
+    <lastmod>2026-10-10</lastmod>
+    <image:image><image:loc>https://malekdamiri.org/img/malek-damiri-navy-tee-park.jpg</image:loc></image:image>
+    <image:image><image:loc>https://malekdamiri.org/img/malek-damiri-navy-polo-downtown.jpg</image:loc></image:image>
+    <image:image><image:loc>https://malekdamiri.org/img/malek-damiri-black-jacket-portrait.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/notes/date-spine/</loc>
+    <lastmod>2026-10-10</lastmod>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/notes/latest-row-per-key/</loc>
+    <lastmod>2026-10-10</lastmod>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/notes/join-fan-out/</loc>
+    <lastmod>2026-10-10</lastmod>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/notes/gaps-and-islands/</loc>
+    <lastmod>2026-10-10</lastmod>
+  </url>
+  <url>
+    <loc>https://malekdamiri.org/notes/lag-previous-row/</loc>
+    <lastmod>2026-10-10</lastmod>
+  </url>
+</urlset>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LAG compares to the previous row, not the previous month | Malek Damiri</title>
+<meta name="description" content="When a month is missing, LAG silently compares to an older one. Fill the months first.">
+<meta name="author" content="Malek Damiri">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://malekdamiri.org/notes/lag-previous-row/">
+<meta property="og:site_name" content="Malek Damiri">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LAG compares to the previous row, not the previous month | Malek Damiri">
+<meta property="og:description" content="When a month is missing, LAG silently compares to an older one. Fill the months first.">
+<meta property="og:url" content="https://malekdamiri.org/notes/lag-previous-row/">
+<meta property="og:image" content="https://malekdamiri.org/img/malek-damiri-navy-tee-park.jpg">
+<meta property="og:image:width" content="900">
+<meta property="og:image:height" content="1199">
+<meta property="og:image:alt" content="Malek Damiri in a navy t-shirt in a park with a large tree behind him">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/css/site.css?v=1">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://malekdamiri.org/#website","url":"https://malekdamiri.org/","name":"Malek Damiri","inLanguage":"en-US","publisher":{"@id":"https://malekdamiri.org/#person"}},{"@type":"Person","@id":"https://malekdamiri.org/#person","name":"Malek Damiri","givenName":"Malek","familyName":"Damiri","url":"https://malekdamiri.org/","jobTitle":"Head of Revenue Operations","homeLocation":{"@type":"Place","name":"Atlanta, Georgia"},"image":{"@id":"https://malekdamiri.org/#image-black-jacket-portrait"},"sameAs":["https://malekdamiri.com/","https://www.linkedin.com/in/malekdamiri/","https://github.com/malekdamiri","https://www.youtube.com/@malek.damiri","https://speakerdeck.com/malekdamiri","https://www.flickr.com/photos/128322174@N02/","https://www.pinterest.com/malek_damiri/","https://medium.com/@malekdamiri43","https://malekdamiri.hashnode.dev/","https://hackernoon.com/u/malekdamiri","https://malekdamiri.blogspot.com/","https://www.goodreads.com/malekdamiri","https://soundcloud.com/malek-damiri","https://x.com/malekdamiri"]},{"@type":"TechArticle","@id":"https://malekdamiri.org/notes/lag-previous-row/#article","headline":"LAG compares to the previous row, not the previous month","description":"When a month is missing, LAG silently compares to an older one. Fill the months first.","url":"https://malekdamiri.org/notes/lag-previous-row/","datePublished":"2026-10-10","dateModified":"2026-10-10","author":{"@id":"https://malekdamiri.org/#person"},"publisher":{"@id":"https://malekdamiri.org/#person"},"isPartOf":{"@id":"https://malekdamiri.org/#website"},"inLanguage":"en-US","proficiencyLevel":"Beginner"}]}</script>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="name" href="/">Malek Damiri</a><nav class="nav" aria-label="Main"><a href="/notes/">Notes</a><a href="/photos/">Photos</a><a href="/about/">About</a></nav></div></header>
+<main id="main"><div class="wrap">
+
+<article>
+<h1>LAG compares to the previous row, not the previous month</h1>
+<p class="meta"><a href="/about/" rel="author">Malek Damiri</a> · <time datetime="2026-10-10">October 10, 2026</time></p>
+<p><code>lag()</code> is the standard way to compute month-over-month change, and it's correct as long as every month has a row. When one is missing, it compares to whatever row came before, and the report never says so.</p>
+<h2>A missing March</h2>
+<pre><code>create table monthly_revenue as select * from (values
+  (date &#x27;2026-01-01&#x27;, 10000.00), (date &#x27;2026-02-01&#x27;, 11000.00), (date &#x27;2026-04-01&#x27;, 12100.00)
+) t(month, revenue);
+
+select month, revenue,
+       lag(revenue) over (order by month) as prior_revenue,
+       round(revenue / lag(revenue) over (order by month) - 1, 3) as mom_change
+from monthly_revenue
+order by month;</code></pre>
+<pre class="result"><code>month        revenue    prior_revenue   mom_change
+2026-01-01   10000.00            null         null
+2026-02-01   11000.00        10000.00          0.1
+2026-04-01   12100.00        11000.00          0.1</code></pre>
+<p>April shows 10% month-over-month growth. It's actually 10% over two months, measured against February, and nothing on the chart says March is missing.</p>
+<h2>Fill the months first</h2>
+<pre><code>with months as (
+  select cast(m as date) as month
+  from generate_series(date &#x27;2026-01-01&#x27;, date &#x27;2026-04-01&#x27;, interval 1 month) as g(m)
+), filled as (
+  select m.month, r.revenue
+  from months as m
+  left join monthly_revenue as r on r.month = m.month
+)
+select month, revenue,
+       lag(revenue) over (order by month) as prior_revenue,
+       round(revenue / lag(revenue) over (order by month) - 1, 3) as mom_change
+from filled
+order by month;</code></pre>
+<pre class="result"><code>month        revenue    prior_revenue   mom_change
+2026-01-01   10000.00            null         null
+2026-02-01   11000.00        10000.00          0.1
+2026-03-01       null        11000.00         null
+2026-04-01   12100.00            null         null</code></pre>
+<p>Now March is visibly empty and April has no month-over-month number, which is the honest answer. Whether March should be zero or "not loaded yet" is worth finding out before anyone fills it in.</p>
+<p>The same rule applies to <code>lead()</code>, to year-over-year with <code>lag(revenue, 12)</code>, and to anything else that counts rows instead of periods: give it a complete calendar first. The <a href="/notes/date-spine/">date spine note</a> covers the daily version.</p>
+<p class="note">Every query here ran in DuckDB 1.5.1 and returned the output shown. This note was written with AI assistance.</p>
+</article>
+<nav class="pager" aria-label="More notes"><a href="/notes/gaps-and-islands/">← Find streaks with gaps and islands</a></nav>
+
+</div></main>
+<footer class="foot"><div class="wrap"><span>&copy; 2026 Malek Damiri · Atlanta</span><span>Essays at <a href="https://malekdamiri.com/" rel="me">malekdamiri.com</a></span></div></footer>
+</body>
+</html>
